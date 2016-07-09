@@ -1,12 +1,23 @@
-
 // DEFINIÇÃO DE VARIÁVEIS DO PROJETO.
-int segundos = 0;
-int minutos = 0;
-int horas = 0;
+unsigned int segundos = 0;
+unsigned int minutos = 0;
+unsigned int horas = 0;
+
+
+volatile boolean leu = false;
+unsigned char buffer[50];
+unsigned int buffer_index = 0;
 
 void setup() {
 
-  Serial.begin(9600);
+  //Serial.begin(9600); O codigo abaixo deve substituir esse Serial.begin.
+  
+  PBR = 0; //Sair do modo de baixo consumo
+  UBR0 = 103; //Define velocidade de transimssao 9600. TEM QUE VER COMO CHEGA NISSO.
+  UCSR0A = 0B00000000;
+  UCSR0B = 0B00000000 | (1 << RXCIE0) | (1 << RXEN0); //Permite interrupcao quando terminar leitura. Receiver enable.
+  UCSR0C = 0B00000000 | (1 << URSEL0) | (1 << UCSZ01) | (1 << UCSZ00); //8 bits: sem paridade. 1 stop bit
+  //O bit URSEL avisa que estamos mexendo no UCSR0C e nao no UBRRH0
 
   // Configuração do Timer 1 (de 16 bits) para contagem dos segundos.
 
@@ -43,7 +54,8 @@ void setup() {
 
 }
 
-ISR(TIMER1_COMPA_vect){
+ISR(TIMER1_COMPA_vect)
+{
   // Interrupção executada toda vez que TCTN1 = OCR1A. Ou seja, conforme as configurações, quando ele atinge 1s.
   segundos = segundos + 1;
 
@@ -51,12 +63,12 @@ ISR(TIMER1_COMPA_vect){
   Serial.println( String(horas) + ':' + String(minutos) + ':' + String(segundos) );
 }
 
-//ISR(//interrupção de leitura de serial){
-  // Tem que ver como funciona, para que serve a interrupção.
+//Interrupção dispara quando terminou leitura.
+ISR(USART_TX_vect)
+{
+	leu = true;
+}
 
-  // O serial servirá para ler alterações do tempo do alarme e hora atual.
-  // PESQUISAR SOBRE ISSO.
-//}
 
 //ISR(interrupção externa 1 e 2){
   // Ativa booleanos que indicam que os botões foram pressionados.
@@ -66,45 +78,49 @@ ISR(TIMER1_COMPA_vect){
 
 void loop() {
   // Verificação de troca entre segundos/minutos/horas.
-  if (segundos >= 60){
+  if (segundos >= 60)
+  {
     segundos = 0;
     minutos = minutos + 1;
 
-    if (minutos >= 60){
+    if (minutos >= 60)
+	{
       minutos = 0;
       horas = horas + 1;
 
-      if (horas >= 24){
+      if (horas >= 24)
+	  {
         horas = 0;
       }
     }
   }
-  /*
-   *  -- quando a interrupção for executada, soma 1 no segundo
-   * if (booleano de passagem de 1 segundo = true){
-   *  incrementa 1 em segundo a variável de unidade dos segundos.
-   *  booleano de passagem de segundo = false
-   *  
-   *  Possivelmente reseta o timer.
-   * }
-   */
-
+  
   /*
    * Faz as comparações de sempre para passagem do tempo.
    * Se segundo_unidade > 9 então segundo_dezena++.
    * Se segundo dezena > 5 então minuto_unidade++
    * e assim por diante.
+   * Depois disso, fazer a logica de transimssao para o display.
    */
 
   /*
    * Comparação com o tempo do alarme, se der igual toca!
    */
 
-  /*
-   * Verificar se há dados inseridos no Serial para leitura.
-   * 
-   * PESQUISAR SOBRE ISSO!
+
+   /* LEITURA SERIAL:
+    * Essa logica muito provavelmente nao funcionara.
+    * O problema é que teremos leu==true quando tiver chegado algyum dado (serial.available == 1).
+	* Porem, depois de ler setamos para falso, e vai sair do while pq provavelmente demora mais pra ler do que executar esse codigo.
+	* Ou seja, estamos usando o mesmo "leu" pra saber se terminou de ler e pra saber se tem algo pra ler.
    */
+   while(leu)
+   {
+	   buffer[buffer_index++] = UDR0;
+	   leu = false;
+   }
+   buffer_index = 0;
+   
 
   /*
    * Ver se o botão foi pressionado para ativar/desativar alarme ou parar de tocar.
