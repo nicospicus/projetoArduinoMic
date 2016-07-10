@@ -46,19 +46,31 @@ void setup() {
   // Habilita a interrupção ativada quando o valor do timer se torna igual ao valor do OCR1A.
   TIMSK1 = 0b00000000 | ( 1 << OCIE1A );
 
-  
   /*  Definição dos registradores
-   *  
    *  TIMER A
    *  Definido para gerar interrupção a cada 1 segundo (configurar contador e pre-scaler).
    *  
    *  CONFIGURAR INTERRUPÇÕES EXTERNAS, SERIAL, ETC.
    */
+   
+   
+  //Configuração das interrrupções externas:
+ 
+  //Primeiro botão:
+  EIMSK = (1 << INT0);
+  EICRA = (1 << ISC01) | (0 << ISC00);
+  //Acionamento configurado em 'FALLING EDGE' para evitar que o comando seja enviado indeterminadamente.
+  //(Caso a pessoa segure o botão)
+  
+  //Segundo botão:
+  EIMSK = (1 << INT1);
+  EICRA = (1 << ISC11) | (0 << ISC10);
+  //Da mesma forma, acionamento em 'FALLING EDGE'
 
 }
 
 // Interrupção executada toda vez que TCTN1 = OCR1A. Ou seja, conforme as configurações, quando ele atinge 1s.
-ISR(TIMER1_COMPA_vect)
+ISR(TIMER1_COMPA_vect)    //Interrupção do modo CTC do Timer1
 {
   segundos = segundos + 1;
 }
@@ -84,12 +96,19 @@ void imprimir(char[] texto)
     }
 }
 
+//Interrupções Externas  (Botões 1 e 2 do relógio)
 
-//ISR(interrupção externa 1 e 2){
-  // Ativa booleanos que indicam que os botões foram pressionados.
-
-  // Só ativa o booleano quando o botão for solto (FALLING EDGE) para evitar que o sistema siga infinitamente por alterações.
-//}
+ ISR(INT0_vect){
+  //alarme_ativado = true;
+  // Ativa booleano que indica que o botão foi pressionado.
+ }
+ 
+  ISR(INT1_vect){
+  //alarme_tocando = true;
+  // Ativa booleano que indica que o botão foi pressionado.
+ }
+ 	
+ }
 
 void loop() {
   // Verificação de troca entre segundos/minutos/horas.
@@ -115,7 +134,7 @@ void loop() {
    * Se segundo_unidade > 9 então segundo_dezena++.
    * Se segundo dezena > 5 então minuto_unidade++
    * e assim por diante.
-   * Depois disso, fazer a logica de transimssao para o display.
+   * Depois disso, fazer a logica de transmissao para o display.
    */
 
   /*
@@ -126,13 +145,17 @@ void loop() {
 	   if(horas == alarme_horas && minutos == alarme_minutos)
 	   {
 		   //Toca alarme
+		   //Como faremos para tocar o alarme?
+		   //Será que conseguimos gerar algum som pelo computador, ou será só visual?
 		   alarme_tocando = true;
 	   }
    }
-   
+  
    if(alarme_tocando)
    {
 	   //Do stuff
+	   //Seria interessante não deixar tocando do mesmo jeito sempre.
+	   //Da para fazer com que a frequência do toque aumente com o tempo, ou que o alarme pare depois de uma hora.
    }
 
    // Se lida uma string por completo, uma linha inteira estará presente no buffer_leitura.
@@ -141,6 +164,7 @@ void loop() {
      // DEFINIR OS NOVOS COMANDOS AO TERMINAR LEITURA AQUI. DEFINIR PROTOCOLO DO TIPO 'a11:20' ativa o alarme ou 'h20:20' muda a hora.
     
      // Por ora, coloquei Print dos caracteres inseridos no buffer.
+     
 	 int i = 0;
      while(buffer_leitura[i] != '\0')
      {
@@ -148,7 +172,8 @@ void loop() {
         UDR0 = buffer_leitura[i++];
      }
 	// Aqui termina a parte temporária.
-	 
+	
+ 
 	 //Configura hora.
 	 if(buffer_leitura[0] == 'H' || buffer_leitura[0] == "h")
 	 {
@@ -162,6 +187,7 @@ void loop() {
 		else
 			imprimir(mensagem_erro);
 	 }
+	 
 	 //Configura alarme
 	 else if(buffer_leitura[0] == 'A' || buffer_leitura[0] == 'a')
 	 {
@@ -184,7 +210,7 @@ void loop() {
      buffer_leitura[0] = '\0';
    }
    
-
+   
   /*
    * Ver se o botão foi pressionado para ativar/desativar alarme ou parar de tocar.
    * Dois botões: alarme e soneca.
@@ -192,5 +218,14 @@ void loop() {
 
   /*
    * PENSAR SOBRE ALGO PARA CONVERSÃO A/D!
+     Ficaria bem legal utilizar conversão A/D.
+     Tenho uma sugestão!
+     Por quê não fazemos um esquema de bateria no relógio? 
+     Poderíamos utilizar um potenciômetro para indicar a quantidade de energia sendo recebida pelo relógio.
+     No caso, seria um relógio com carregamento por energia solar.
+     Daria para ir regulando a incidência de sol pelo potenciômetro ou então fazer uma programação para
+     gerar valores aleatório a cada hora, algo assim.
+     
+     O que acham? Só uma ideia mesmo.
    */
 }
