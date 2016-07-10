@@ -1,3 +1,7 @@
+#include <LiquidCrystal.h>
+// LiquidCrystal(RS, EN, D4, D5, D6, D7) -- ordem de conexão dos pinos, conforme a library.
+LiquidCrystal lcd(12, 13, 11, 10, 9, 8);
+
 // DEFINIÇÃO DE VARIÁVEIS DO PROJETO.
 unsigned int segundos = 0;
 unsigned int minutos = 0;
@@ -14,7 +18,7 @@ unsigned int buffer_index = 0;
 
 unsigned int bateria = 100;
 
-const char mensagem_erro[] = "Comando invalido!";
+char mensagem_erro[] = "Comando invalido!";
 
 void setup() 
 {
@@ -57,10 +61,14 @@ void setup()
   EIMSK = (1 << INT1);
   EICRA = (1 << ISC11) | (0 << ISC10);
   //Da mesma forma, acionamento em 'FALLING EDGE'
+
+  //=========== Configuração do display LCD: =========== 
+  // Inicia a exibição no display LCD, definindo um display de 16 colunas e 2 linhas.
+  lcd.begin(16, 2);
 }
 
-// Interrupção executada toda vez que TCTN1 = OCR1A. Ou seja, conforme as configurações, quando ele atinge 1s.
-ISR(TIMER1_COMPA_vect)    //Interrupção do modo CTC do Timer1
+// Interrupção executada toda vez que TCTN1 = OCR1A (modo CTC). Ou seja, conforme as configurações, quando ele atinge 1s.
+ISR(TIMER1_COMPA_vect)
 {
   segundos = segundos + 1;
 }
@@ -76,16 +84,15 @@ ISR(USART_RX_vect)
 }
 
 //Imprime no serial.
-void imprimir(char[] texto)
+void imprimir(char texto[])
 {
-    int i = 0;
-    while(texto[i] != '\0')
-    {
-	while( !(UCSR0A & ( 1 << TXC0 )) ); //Espera estar livre pra escrever
-        UDR0 = buffer_leitura[i++];
-    }
+  int i = 0;
+  while(texto[i] != '\0')
+  {
+    while( !(UCSR0A & ( 1 << TXC0 )) ); //Espera estar livre pra escrever
+    UDR0 = buffer_leitura[i++];
+  }
 }
-
 
 //Interrupcao para o botao 1, que ativa/desativa alarme.
 ISR(INT0_vect)
@@ -99,9 +106,59 @@ ISR(INT1_vect)
 {
   alarme_tocando = false;
 }
- 
+
+// Rotina que leva ao display tudo que deve ser exibido, conforme as configurações adotadas e as variáveis.
+void exibe_display()
+{
+  // Coloca o cursor na posição inicial das horas.
+  lcd.setCursor(0,0);
+  
+  // Coloca um zero à frente das horas, caso seja um dígito menor que dez.
+  if(horas < 10)
+    lcd.print( "0" + String(horas) );
+  else
+    lcd.print( String(horas) );
+    
+  lcd.print(":");
+  
+  // Repete o processo para os minutos e segundos.
+  if(minutos < 10)
+    lcd.print( "0" + String(minutos) );
+  else
+    lcd.print( String(minutos) );
+  lcd.print(":");
+  
+  if(segundos < 10)
+    lcd.print( "0" + String(segundos) );
+  else
+    lcd.print( String(segundos) );
+
+  // Se o alarme estiver acionado, exibe um caractere no canto da tela indicando.
+  if(alarme_ativado)
+  {
+    lcd.setCursor(15,0);
+    lcd.print("A");
+  }
+  else
+  {
+    lcd.setCursor(15,0);
+    lcd.print(" ");
+  }
+  // Se o alarme estiver tocando (o que é definido na rotina principal), exibe a mensagem.
+  if(alarme_tocando)
+  {
+    lcd.setCursor(0,1);
+    lcd.print("ALARME TOCANDO!");
+  }
+  else
+  {
+    lcd.setCursor(0,1);
+    lcd.print("               ");
+  }
+}
 
 void loop() {
+  
   // Verificação de troca entre segundos/minutos/horas.
   if (segundos >= 60)
   {
@@ -123,76 +180,56 @@ void loop() {
     }
   }
   
-  /*
-   * Faz as comparações de sempre para passagem do tempo.
-   * Se segundo_unidade > 9 então segundo_dezena++.
-   * Se segundo dezena > 5 então minuto_unidade++
-   * e assim por diante.
-   * Depois disso, fazer a logica de transmissao para o display.
-   */
-
-  /*
-   * Comparação com o tempo do alarme, se der igual toca!
-   */
-   if(alarme_ativado)
-   {
-	if(horas == alarme_horas && minutos == alarme_minutos)
-	{
-	     //Toca alarme
-	     //Como faremos para tocar o alarme?
-	     //Será que conseguimos gerar algum som pelo computador, ou será só visual?
-	     alarme_tocando = true;
-	}
-   }
+  if(alarme_ativado)
+  {
+    if(horas == alarme_horas && minutos == alarme_minutos)
+    {
+      // Ativa a variável alarme_tocando. Na rotina exibe_display, teremos a exibição de uma mensagem exibida.
+      alarme_tocando = true;
+    }
+  }
   
-   if(alarme_tocando)
-   {
-	   //Do stuff
-	   //Seria interessante não deixar tocando do mesmo jeito sempre.
-	   //Da para fazer com que a frequência do toque aumente com o tempo, ou que o alarme pare depois de uma hora.
-   }
+  if(alarme_tocando)
+  {
+    //Do stuff
+    //Seria interessante não deixar tocando do mesmo jeito sempre.
+    //Da para fazer com que a frequência do toque aumente com o tempo, ou que o alarme pare depois de uma hora.
+  }
 
-   // Se lida uma string por completo, uma linha inteira estará presente no buffer_leitura.
+  // Se lida uma string por completo, uma linha inteira estará presente no buffer_leitura.
   if(leu_string)
-   {
-    // Por ora, coloquei Print dos caracteres inseridos no buffer.
-    i = 0;
-     while(buffer_leitura[i] != '\0')
-     {
-	while( !(UCSR0A & ( 1 << TXC0 )) );
-        UDR0 = buffer_leitura[i++];
-     }
-	// Aqui termina a parte temporária.
-	
- 
-	//Verifica se o comando faz sentido
-	if((buffer_leitura[1]*10 + buffer_leitura[2] >= 0 || buffer_leitura[1]*10 + buffer_leitura[2] < 24)
-		&& (buffer_leitura[4]*10 + buffer_leitura[5] >= 0 || buffer_leitura[4]*10 + buffer_leitura[5] < 60))
-	{
-		//Configura hora
-		if(buffer_leitura[0] == 'H' || buffer_leitura[0] == "h")
-		{
-			horas = buffer_leitura[1]*10 + buffer_leitura[2];
-			minutos = buffer_leitura[4]*10 + buffer_leitura[5];
-		}	 
-		//Configura alarme
-		else if(buffer_leitura[0] == 'A' || buffer_leitura[0] == 'a')
-		{
-			alarme_horas = buffer_leitura[1]*10 + buffer_leitura[2];
-			alarme_minutos = buffer_leitura[4]*10 + buffer_leitura[5];
-		}	
-		else //Se o comando for invalido
-			imprimit(mensagem_erro);
-	}
-	else //Se o comando for invalido.
-		imprimir(mensagem_erro);
+  {
+    // Verifica se o comando faz sentido para HH:MM:SS
+    if((buffer_leitura[1]*10 + buffer_leitura[2] >= 0 || buffer_leitura[1]*10 + buffer_leitura[2] < 24)
+      && (buffer_leitura[4]*10 + buffer_leitura[5] >= 0 || buffer_leitura[4]*10 + buffer_leitura[5] < 60))
+    {
+      // Configura hora (colocando a letra 'H' ou 'h' na frente do comando).
+      if(buffer_leitura[0] == 'H' || buffer_leitura[0] == 'h')
+      {
+        horas = buffer_leitura[1]*10 + buffer_leitura[2];
+        minutos = buffer_leitura[4]*10 + buffer_leitura[5];
+      }  
+      
+      // Configura alarme (colocando a letra 'A' ou 'a' na frente do comando).
+      else if(buffer_leitura[0] == 'A' || buffer_leitura[0] == 'a')
+      {
+        alarme_horas = buffer_leitura[1]*10 + buffer_leitura[2];
+        alarme_minutos = buffer_leitura[4]*10 + buffer_leitura[5];
+      } 
+      else // Se o comando for invalido
+        imprimir(mensagem_erro);
+    }
+    else //Se o comando for invalido.
+      imprimir(mensagem_erro);
 
-     // Esvazia o que está presente no buffer_leitura e retorna as variáveis booleanas aos valores originais.
-     leu_string = false;
-     buffer_index = 0;
-     buffer_leitura[0] = '\0';
-   }
-   
+    // Esvazia o que está presente no buffer_leitura e retorna as variáveis booleanas aos valores originais.
+    leu_string = false;
+    buffer_index = 0;
+    buffer_leitura[0] = '\0';
+  }
+
+  // Promove a exibição no display das variáveis necessárias.
+  exibe_display();
 
   /*
    * PENSAR SOBRE ALGO PARA CONVERSÃO A/D!
