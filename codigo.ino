@@ -110,7 +110,7 @@ void loop() {
      // DEFINIR OS NOVOS COMANDOS AO TERMINAR LEITURA AQUI. DEFINIR PROTOCOLO DO TIPO 'a11:20' ativa o alarme ou 'h20:20' muda a hora.
     
      // Por ora, coloquei Print dos caracteres inseridos no buffer.
-     for( int i = 0; i < sizeof(buffer_leitura); i++)
+     while(buffer_leitura[i] != '\0')
      {
         UDR0 = buffer_leitura[i];
         while( !(UCSR0A & ( 1 << TXC0 )) );
@@ -120,11 +120,7 @@ void loop() {
      // Esvazia o que está presente no buffer_leitura e retorna as variáveis booleanas aos valores originais.
      leu_string = false;
      buffer_index = 0;
-     for(int i = 0; i < sizeof(buffer_leitura); i++)
-     {
-       // Limpa todo o buffer_leitura.
-       buffer_leitura[i] = (char)0;
-     }
+     buffer_leitura[0] = '\0';
    }
    
 
