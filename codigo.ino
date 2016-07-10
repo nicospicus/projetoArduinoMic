@@ -3,31 +3,27 @@ unsigned int segundos = 0;
 unsigned int minutos = 0;
 unsigned int horas = 0;
 
-
-volatile boolean leu = false;
-unsigned char buffer[50];
+volatile boolean leu_string = false;
+unsigned char buffer_leitura[50];
 unsigned int buffer_index = 0;
 
 void setup() {
 
-  //Serial.begin(9600); O codigo abaixo deve substituir esse Serial.begin.
-  
-  PBR = 0; //Sair do modo de baixo consumo
-  UBR0 = 103; //Define velocidade de transimssao 9600. TEM QUE VER COMO CHEGA NISSO.
-  UCSR0A = 0B00000000;
-  UCSR0B = 0B00000000 | (1 << RXCIE0) | (1 << RXEN0); //Permite interrupcao quando terminar leitura. Receiver enable.
-  UCSR0C = 0B00000000 | (1 << URSEL0) | (1 << UCSZ01) | (1 << UCSZ00); //8 bits: sem paridade. 1 stop bit
-  //O bit URSEL avisa que estamos mexendo no UCSR0C e nao no UBRRH0
+  // Configuração do USART0 em modo Assíncrono para Comunicação Serial.
+
+  // Para definir o BAUD Rate como 9600, calcula-se [freq/(16*BAUD)] - 1
+  UBRR0 = 103;
+
+  UCSR0A = 0b00000000;
+  // Habilita a interrupção de fim de leitura de dados e habilita a recepção de dados.
+  UCSR0B = 0b00000000 | ( 1 << RXCIE0 ) | ( 1 << RXEN0 ) | ( 1 << TXEN0 );  // DESABILITAR O TXEN AO FINAL, USADO EXPERIMENTALMENTE.
+  // Define: operação em modo assíncrono; sem paridade; 1 stop bit; 8 bits; 1 stop bit
+  UCSR0C = 0b00000000 | ( 1 << UCSZ01 ) | ( 1 << UCSZ00 );
 
   // Configuração do Timer 1 (de 16 bits) para contagem dos segundos.
 
-  // Inicialmente, coloca valor zero nos registradores do Timer 1.
-  TCCR1A = 0;
-  TCCR1B = 0;
-  TIMSK1 = 0;
-  
   // Configura o Prescaler para frequência de (16MHz/1024) = 15625Hz.
-  TCCR1B |= ( 1 << CS12 ) | ( 0 << CS11 ) | ( 1 << CS10 );
+  TCCR1B = 0b00000000 | ( 1 << CS12 ) | ( 0 << CS11 ) | ( 1 << CS10 );
 
   // Zera o valor inicial do Timer.
   TCNT1 = 0;
@@ -37,11 +33,11 @@ void setup() {
   OCR1A = 15625;
 
   // Define o modo do Timer 1 como CTC (Clear Timer on Compare) com OCR1A.
-  TCCR1A |= ( 0 << WGM11 ) | ( 0 << WGM10 );
+  TCCR1A = 0b00000000 | ( 0 << WGM11 ) | ( 0 << WGM10 );
   TCCR1B |= ( 0 << WGM13 ) | ( 1 << WGM12 );
 
   // Habilita a interrupção ativada quando o valor do timer se torna igual ao valor do OCR1A.
-  TIMSK1 |= ( 1 << OCIE1A );
+  TIMSK1 = 0b00000000 | ( 1 << OCIE1A );
 
   
   /*  Definição dos registradores
@@ -54,19 +50,20 @@ void setup() {
 
 }
 
+// Interrupção executada toda vez que TCTN1 = OCR1A. Ou seja, conforme as configurações, quando ele atinge 1s.
 ISR(TIMER1_COMPA_vect)
 {
-  // Interrupção executada toda vez que TCTN1 = OCR1A. Ou seja, conforme as configurações, quando ele atinge 1s.
   segundos = segundos + 1;
-
-  // Print temporário a cada alteração de segundos, para verificar a validade da implementação.
-  Serial.println( String(horas) + ':' + String(minutos) + ':' + String(segundos) );
 }
 
-//Interrupção dispara quando terminou leitura.
-ISR(USART_TX_vect)
+// Interrupção dispara quando toda a leitura de 8 bits foi terminada.
+ISR(USART_RX_vect)
 {
-	leu = true;
+  buffer_leitura[buffer_index++] = UDR0;
+  if(buffer_leitura[buffer_index] == 0)
+  {
+    leu_string = true;
+  }
 }
 
 
@@ -84,12 +81,12 @@ void loop() {
     minutos = minutos + 1;
 
     if (minutos >= 60)
-	{
+    {
       minutos = 0;
       horas = horas + 1;
 
       if (horas >= 24)
-	  {
+      {
         horas = 0;
       }
     }
@@ -107,19 +104,28 @@ void loop() {
    * Comparação com o tempo do alarme, se der igual toca!
    */
 
-
-   /* LEITURA SERIAL:
-    * Essa logica muito provavelmente nao funcionara.
-    * O problema é que teremos leu==true quando tiver chegado algyum dado (serial.available == 1).
-	* Porem, depois de ler setamos para falso, e vai sair do while pq provavelmente demora mais pra ler do que executar esse codigo.
-	* Ou seja, estamos usando o mesmo "leu" pra saber se terminou de ler e pra saber se tem algo pra ler.
-   */
-   while(leu)
+   // Se lida uma string por completo, uma linha inteira estará presente no buffer_leitura.
+  if(leu_string)
    {
-	   buffer[buffer_index++] = UDR0;
-	   leu = false;
+     // DEFINIR OS NOVOS COMANDOS AO TERMINAR LEITURA AQUI. DEFINIR PROTOCOLO DO TIPO 'a11:20' ativa o alarme ou 'h20:20' muda a hora.
+    
+     // Por ora, coloquei Print dos caracteres inseridos no buffer.
+     for( int i = 0; i < sizeof(buffer_leitura); i++)
+     {
+        UDR0 = buffer_leitura[i];
+        while( !(UCSR0A & ( 1 << TXC0 )) );
+     }
+     // Aqui termina a parte temporária.
+
+     // Esvazia o que está presente no buffer_leitura e retorna as variáveis booleanas aos valores originais.
+     leu_string = false;
+     buffer_index = 0;
+     for(int i = 0; i < sizeof(buffer_leitura); i++)
+     {
+       // Limpa todo o buffer_leitura.
+       buffer_leitura[i] = (char)0;
+     }
    }
-   buffer_index = 0;
    
 
   /*
