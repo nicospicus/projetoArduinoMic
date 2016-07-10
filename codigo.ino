@@ -10,7 +10,6 @@ unsigned int buffer_index = 0;
 void setup() {
 
   // Configuração do USART0 em modo Assíncrono para Comunicação Serial.
-
   // Para definir o BAUD Rate como 9600, calcula-se [freq/(16*BAUD)] - 1
   UBRR0 = 103;
 
@@ -29,8 +28,9 @@ void setup() {
   TCNT1 = 0;
 
   // O valor máximo do counter será o número de ticks do pre-scaler para gerar 1s.
-  // Com frequência de 15625Hz (16Mhz/1024), serão necessários 15625 ticks para obter 1s.
-  OCR1A = 15625;
+  // Com frequência de 15625Hz (16Mhz/1024), serão necessários 15624 ticks para obter 1s.
+  OCR1A = 15624;   // No modo CTC, sempre que o tempo desejado é atingido, ele se reseta.
+                   //Como o reset leva um ciclo de clock para ser concluído, temos 15625-1=15624
 
   // Define o modo do Timer 1 como CTC (Clear Timer on Compare) com OCR1A.
   TCCR1A = 0b00000000 | ( 0 << WGM11 ) | ( 0 << WGM10 );
