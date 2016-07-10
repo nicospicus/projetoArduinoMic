@@ -3,9 +3,16 @@ unsigned int segundos = 0;
 unsigned int minutos = 0;
 unsigned int horas = 0;
 
+unsigned int alarme_minutos = 0;
+unsigned int alarme_horas = 0;
+volatile boolean alarme_ativado = false;
+volatile boolean alarme_tocando = false;
+
 volatile boolean leu_string = false;
 unsigned char buffer_leitura[50];
 unsigned int buffer_index = 0;
+
+const char mensagem_erro[] = "Comando invalido!";
 
 void setup() {
 
@@ -66,6 +73,17 @@ ISR(USART_RX_vect)
   }
 }
 
+//Serial print
+void imprimir(char[] texto)
+{
+	int i = 0;
+	while(texto[i] != '\0')
+    {
+		while( !(UCSR0A & ( 1 << TXC0 )) ); //Espera estar livre pra escrever
+        UDR0 = buffer_leitura[i++];
+    }
+}
+
 
 //ISR(interrupção externa 1 e 2){
   // Ativa booleanos que indicam que os botões foram pressionados.
@@ -103,6 +121,19 @@ void loop() {
   /*
    * Comparação com o tempo do alarme, se der igual toca!
    */
+   if(alarme_ativado)
+   {
+	   if(horas == alarme_horas && minutos == alarme_minutos)
+	   {
+		   //Toca alarme
+		   alarme_tocando = true;
+	   }
+   }
+   
+   if(alarme_tocando)
+   {
+	   //Do stuff
+   }
 
    // Se lida uma string por completo, uma linha inteira estará presente no buffer_leitura.
   if(leu_string)
@@ -110,12 +141,42 @@ void loop() {
      // DEFINIR OS NOVOS COMANDOS AO TERMINAR LEITURA AQUI. DEFINIR PROTOCOLO DO TIPO 'a11:20' ativa o alarme ou 'h20:20' muda a hora.
     
      // Por ora, coloquei Print dos caracteres inseridos no buffer.
+	 int i = 0;
      while(buffer_leitura[i] != '\0')
      {
-        UDR0 = buffer_leitura[i];
-        while( !(UCSR0A & ( 1 << TXC0 )) );
+		while( !(UCSR0A & ( 1 << TXC0 )) );
+        UDR0 = buffer_leitura[i++];
      }
-     // Aqui termina a parte temporária.
+	// Aqui termina a parte temporária.
+	 
+	 //Configura hora.
+	 if(buffer_leitura[0] == 'H' || buffer_leitura[0] == "h")
+	 {
+		 //Verifica se o comando faz sentido
+		if((buffer_leitura[1]*10 + buffer_leitura[2] >= 0 || buffer_leitura[1]*10 + buffer_leitura[2] < 24)
+			&& (buffer_leitura[4]*10 + buffer_leitura[5] >= 0 || buffer_leitura[4]*10 + buffer_leitura[5] < 60))
+		{
+			horas = buffer_leitura[1]*10 + buffer_leitura[2];
+			minutos = buffer_leitura[4]*10 + buffer_leitura[5];
+		}
+		else
+			imprimir(mensagem_erro);
+	 }
+	 //Configura alarme
+	 else if(buffer_leitura[0] == 'A' || buffer_leitura[0] == 'a')
+	 {
+		//Verifica se o comando faz sentido
+		if((buffer_leitura[1]*10 + buffer_leitura[2] >= 0 || buffer_leitura[1]*10 + buffer_leitura[2] < 24)
+			&& (buffer_leitura[4]*10 + buffer_leitura[5] >= 0 || buffer_leitura[4]*10 + buffer_leitura[5] < 60))
+		{
+			alarme_horas = buffer_leitura[1]*10 + buffer_leitura[2];
+			alarme_minutos = buffer_leitura[4]*10 + buffer_leitura[5];
+		}
+		else
+			imprimir(mensagem_erro);
+	 }
+	 else //Se o comando for invalido.
+		imprimir(mensagem_erro);
 
      // Esvazia o que está presente no buffer_leitura e retorna as variáveis booleanas aos valores originais.
      leu_string = false;
