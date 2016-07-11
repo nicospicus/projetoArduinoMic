@@ -17,6 +17,7 @@ unsigned char buffer_leitura[50];
 unsigned int buffer_index = 0;
 
 unsigned int bateria = 100;
+unsigned int luminosidade = 0;
 
 char mensagem_erro[] = "Comando invalido!";
 
@@ -30,7 +31,6 @@ void setup()
   // Define: operação em modo assíncrono; sem paridade; 1 stop bit; 8 bits; 1 stop bit
   UCSR0C = 0b00000000 | ( 1 << UCSZ01 ) | ( 1 << UCSZ00 );
   
-
   //=========== Configuração do Timer 1 (de 16 bits) para contagem dos segundos. ===========
   // Configura o Prescaler para frequência de (16MHz/1024) = 15625Hz.
   TCCR1B = 0b00000000 | ( 1 << CS12 ) | ( 0 << CS11 ) | ( 1 << CS10 );
@@ -41,6 +41,7 @@ void setup()
   // Mas, no modo CTC, sempre que o tempo desejado é atingido, ele se reseta.
   // Como o reset leva um ciclo de clock para ser concluído, temos 15625-1=15624
   OCR1A = 15624; 
+
   
   // Define o modo do Timer 1 como CTC (Clear Timer on Compare) com OCR1A.
   TCCR1A = 0b00000000 | ( 0 << WGM11 ) | ( 0 << WGM10 );
@@ -49,7 +50,16 @@ void setup()
   // Habilita a interrupção ativada quando o valor do timer se torna igual ao valor do OCR1A.
   TIMSK1 = 0b00000000 | ( 1 << OCIE1A );
    
-   
+  //==============Configuração  ADC (Conversor Analógico-Digital).=============
+    // AREF = AVcc
+    ADMUX = (1<<REFS0);
+ 
+    // Habilita o ADC e define prescaler de 128
+    // 16000000/128 = 125000
+    ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
+    sei();     //Habilitação global de interrupção
+
+  
   //=========== Configuração das interrrupções externas: =========== 
   //Primeiro botão:
   EIMSK |= (1 << INT0);
@@ -165,9 +175,10 @@ void loop() {
   {
     segundos = 0;
     minutos = minutos + 1;
-    bateria--; //A cada minuto, perde 1% de bateria.
-    //Aqui, vamos usar o valor lido do potenciometro para adicionar um valor
-    //entre 0 e 3 (ou outros valores) à bateria.
+    bateria-=2; //A cada minuto, perde 2% de bateria.
+    ADconversion; //Executa a função que lê o valor do potenciômetro e coloca em luminosidade 
+    bateria += (luminosidade*3)/1023.0  //soma à bateria o valor de luminosidade convertido em uma faixa de 0 a 3%
+    
 
     if (minutos >= 60)
     {
@@ -229,12 +240,18 @@ void loop() {
     buffer_leitura[0] = '\0';
   }
 
+void (ADconversion){
+  ADCSRA |= (1<<ADSC);
+  // Aguarda até que a conversão seja concluída
+  // Ao final, ADSC virá '0' novamente
+  while(ADCSRA & (1<<ADSC));
+  valor = ADC;
+}
+
   // Promove a exibição no display das variáveis necessárias.
   exibe_display();
 
   /*
-   * PENSAR SOBRE ALGO PARA CONVERSÃO A/D!
-     Ficaria bem legal utilizar conversão A/D.
      Tenho uma sugestão!
      Por quê não fazemos um esquema de bateria no relógio? 
      Poderíamos utilizar um potenciômetro para indicar a quantidade de energia sendo recebida pelo relógio.
