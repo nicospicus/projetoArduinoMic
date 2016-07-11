@@ -9,12 +9,12 @@ unsigned int horas = 0;
 
 unsigned int alarme_minutos = 0;
 unsigned int alarme_horas = 0;
-volatile boolean alarme_ativado = false;
+volatile boolean alarme_ativado = true;
 volatile boolean alarme_tocando = false;
 volatile boolean alarme_lock = false;
 
 volatile boolean leu_string = false;
-char buffer_leitura[200];
+char buffer_leitura[100];
 unsigned int buffer_index = 0;
 
 int bateria = 100;
@@ -31,7 +31,7 @@ void setup()
   UCSR0A = 0b00000000;
   // Habilita a interrupção de fim de leitura de dados e habilita a recepção de dados.
   UCSR0B = 0b00000000 | ( 1 << RXCIE0 ) | ( 1 << RXEN0 ) | ( 1 << TXEN0 );
-  // Define: operação em modo assíncrono; sem paridade; 1 stop bit; 8 bits; 1 stop bit
+  // Define: operação em modo assíncrono; sem paridade; 1 stop bit; 8 bits.
   UCSR0C = 0b00000000 | ( 1 << UCSZ01 ) | ( 1 << UCSZ00 );
   
 
