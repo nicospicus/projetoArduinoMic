@@ -52,14 +52,14 @@ void setup()
    
   //=========== Configuração das interrrupções externas: =========== 
   //Primeiro botão:
-  EIMSK = (1 << INT0);
-  EICRA = (1 << ISC01) | (0 << ISC00);
+  EIMSK |= (1 << INT0);
+  EICRA |= (1 << ISC01) | (0 << ISC00);
   //Acionamento configurado em 'FALLING EDGE' para evitar que o comando seja enviado indeterminadamente.
   //(Caso a pessoa segure o botão)
   
   //Segundo botão:
-  EIMSK = (1 << INT1);
-  EICRA = (1 << ISC11) | (0 << ISC10);
+  EIMSK |= (1 << INT1);
+  EICRA |= (1 << ISC11) | (0 << ISC10);
   //Da mesma forma, acionamento em 'FALLING EDGE'
 
   //=========== Configuração do display LCD: =========== 
@@ -97,8 +97,9 @@ void imprimir(char texto[])
 //Interrupcao para o botao 1, que ativa/desativa alarme.
 ISR(INT0_vect)
 {
-  alarme_ativado = !alarme_ativado;
-  //Falta ligar alguma coisa que mostre o estado do alarme.
+  alarme_ativado = !alarme_ativado; 
+  //A ativação do alarme é indicada no Display LCD
+
 }
  
 //Interrupcao para o botao 2, que faz com que o alarme pare de tocar.
