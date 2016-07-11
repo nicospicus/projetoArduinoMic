@@ -127,8 +127,11 @@ ISR(INT0_vect)
 //Interrupcao para o botao 2, que faz com que o alarme pare de tocar.
 ISR(INT1_vect)
 {
-  alarme_tocando = false;
-  alarme_lock = true; //Trava o alarme, para que nao toque mais nesse minuto.
+  if(alarme_tocando)
+  {
+    alarme_tocando = false;
+    alarme_lock = true; // Trava o alarme, para que não toque mais nesse minuto.
+  }
 }
 
 //Interrupcao que sinaliza o fim da conversao AD.
